@@ -1,0 +1,25 @@
+# Smallest end-to-end LoRA training smoke. Proves the pipeline works on
+# this laptop before renting a GPU for the full run. NOT a real training
+# recipe — 20 steps is nowhere near enough to move the reward model.
+
+base_model: google/gemma-4-E4B-it-qat-q4_0-unquantized
+dataset: EditScore/EditScore-Reward-Data
+dataset_split: train
+dataset_take: 10                # streaming, first 10 rows only
+lora:
+  r: 8
+  lora_alpha: 16
+  lora_dropout: 0.0
+  target_modules: [q_proj, k_proj, v_proj, o_proj]
+  bias: none
+train:
+  max_steps: 20
+  per_device_batch_size: 1
+  gradient_accumulation_steps: 1
+  learning_rate: 1.0e-4
+  bf16: true                    # osx-arm64 supports bf16 via torch.mps; falls back on other platforms
+  gradient_checkpointing: true
+  output_dir: adapters/smoke
+verify:
+  save_and_reload: true         # save adapter, delete in-memory, reload from disk, verify weights match
+  merge_roundtrip: true         # merge adapter into base, unmerge, verify base weights unchanged

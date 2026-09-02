@@ -1,0 +1,127 @@
+# Environment declared per the CLAUDE.md rule: no uv, no bare pip. The Hailo
+# split follows the rf-detr-cpp reference: `gate` runs on any desk and answers
+# "does the vision encoder stay inside the Hailo operator set" without needing
+# DFC; `dfc` installs the linux_x86_64 wheel and runs the real compile on a
+# Linux host (or Vast rental). The pair's DISAGREEMENT is the finding.
+
+[workspace]
+name = "editscore-lora-qwen3vl-4b"
+version = "0.1.0"
+description = "EditScore reward-model role via Qwen3-VL-4B (MLX for Mac mini; LoRA training path for 3090)"
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "linux-64", "win-64"]
+
+# ---- Track A: text-decoder LoRA training (runs on Mac + rented GPU) --------
+
+[feature.lora.dependencies]
+python = "3.11.*"
+
+[feature.lora.pypi-dependencies]
+torch = ">=2.6"
+transformers = ">=4.46"
+peft = ">=0.13"
+datasets = ">=3.0"
+accelerate = ">=1.0"
+sentencepiece = "*"
+pyyaml = "*"
+safetensors = "*"
+huggingface_hub = ">=0.26"
+
+# bitsandbytes has no macOS wheels; the CUDA / rocm path only. It is
+# required for QLoRA-style 4-bit base loading on the Vast rental (linux-64)
+# and pointless on this Mac, so it lands as a linux-64-only target dep.
+[feature.lora.target.linux-64.pypi-dependencies]
+bitsandbytes = ">=0.44"
+
+[feature.lora.tasks]
+smoke = "python scripts/smoke.py --config configs/smoke.yaml"
+
+# ---- Track B: Hailo vision-encoder QFT (gate anywhere, DFC on linux-64) ----
+
+# CPU-only torch on purpose: the gate exports ONNX, walks the operator set,
+# and needs no accelerator. A CUDA build would add gigabytes and change no
+# answer. Same argument the rf-detr-cpp gate feature makes.
+[feature.gate.dependencies]
+python = "3.11.*"
+
+[feature.gate.pypi-dependencies]
+numpy = ">=1.26"
+onnx = "*"
+onnxruntime = "*"
+# `torch.onnx.export` in torch 2.6+ dispatches to the dynamo path which needs
+# onnxscript at import time even when we ask for the older TorchScript
+# exporter. Declared once here rather than discovered as a ModuleNotFoundError.
+onnxscript = "*"
+torch = { version = ">=2.6", index = "https://download.pytorch.org/whl/cpu" }
+torchvision = { version = "*", index = "https://download.pytorch.org/whl/cpu" }
+transformers = ">=4.46"
+# Gemma4Processor requires PIL + torchvision to build vision inputs — the
+# processor is the canonical way to discover pixel_values / pixel_position_ids shape.
+pillow = ">=10"
+usd-core = "==26.8"
+pyyaml = "*"
+
+[feature.gate.tasks]
+# Export Gemma-4-E4B vision encoder to ONNX and check its op set against
+# whatever `hailo_ops.usda` says the target (Hailo-10H) accepts.
+gate-vision-encoder = "python scripts/gate_vision_encoder.py"
+# The `uv` blocklist enforcement rf-detr-cpp already ships; symlinked here.
+no-uv = "python scripts/check_no_uv.py"
+test-no-uv = "python scripts/check_no_uv.py --self-test"
+
+# ---- DFC: linux-64 only ----------------------------------------------------
+# The wheel is proprietary + linux_x86_64. This feature exists to make one
+# thing true: "I ran the real DFC on this exact ONNX." It fires only on
+# Linux x86_64; on any other platform pixi refuses to select it, which is
+# the honest failure mode.
+
+[feature.dfc]
+platforms = ["linux-64"]
+
+[feature.dfc.dependencies]
+python = "3.11.*"                # DFC 5.3.0 supports up to 3.12
+
+[feature.dfc.pypi-dependencies]
+# Real DFC install path is documented in scripts/install_dfc.md; pixi cannot
+# fetch the wheel because it lives at ~/Applications/ (proprietary, gated
+# behind Hailo registration). The install step is manual and one-time.
+
+[feature.dfc.tasks]
+# Runs the real DFC parse on the ONNX the gate exported. Disagreement with
+# the gate's answer is the actionable finding.
+dfc-parse = "python scripts/gate_dfc_parse.py"
+# QFT: Hailo's own quantization-aware training pass on the vision encoder.
+qft = "python scripts/qft_vision_encoder.py"
+
+[environments]
+lora = { features = ["lora"], solve-group = "lora" }
+gate = { features = ["gate"], solve-group = "gate" }
+dfc  = { features = ["dfc"],  solve-group = "dfc" }
+mlx  = { features = ["mlx"],  solve-group = "mlx" }
+
+# ---- MLX: Apple-Silicon-native EditScore reward inference (Mac mini) ---
+# Ships the reward-model role WITHOUT training: EditScore already published
+# a peft LoRA over Qwen3-VL-4B-Instruct (270 MB, apache-2.0). MLX has a
+# 4-bit port of the base (3.1 GB). Total ~3.4 GB. Fits Mac mini M2 Pro
+# 32 GB ten times over. Zero rental cost.
+
+[feature.mlx]
+platforms = ["osx-arm64"]
+
+[feature.mlx.dependencies]
+python = "3.11.*"
+
+[feature.mlx.pypi-dependencies]
+mlx = ">=0.20"
+mlx-vlm = ">=0.1"                 # loads vision-language models under MLX
+peft = ">=0.13"                   # to merge EditScore's LoRA into the base
+transformers = ">=4.46"           # peft merges via transformers
+torch = ">=2.6"                   # peft needs torch for the merge step (cpu ok)
+# Qwen3VLVideoProcessor pulls torchvision at import time via transformers.
+torchvision = "*"
+pillow = ">=10"
+huggingface_hub = ">=0.26"
+sentencepiece = "*"
+
+[feature.mlx.tasks]
+smoke-editscore = "python scripts/smoke_editscore_mlx.py"

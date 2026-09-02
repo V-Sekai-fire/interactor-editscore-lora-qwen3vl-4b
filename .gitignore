@@ -1,0 +1,13 @@
+.pixi/
+adapters/
+__pycache__/
+*.pyc
+.hf_cache/
+build/
+# Model / adapter artifacts belong on HF (chibifire/*), not in this repo.
+# See MEMORY:weights-live-on-huggingface.
+*.onnx
+*.onnx.data
+*.safetensors
+*.gguf
+adapters/
