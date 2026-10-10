@@ -17,4 +17,4 @@ The `mlx` environment, and so the inference smoke test, runs on Apple silicon on
 
 ## Licence
 
-The licence of the code is not stated; the repository carries no LICENSE file. Base model and adapter weights keep their upstream licences.
+MIT. See [LICENSE](LICENSE). Base model and adapter weights keep their upstream licences.
