@@ -4,7 +4,7 @@ The image-edit reward model for the avatar pipeline: a published edit-scoring ad
 
 ## What it is for
 
-It scores an image edit against its instruction, so the mask-scoring loop of RFD 1173 can reward the generators. The repository holds an inference smoke test and the scaffold for training task-specific adapters. Trained weights go to a model hub and are never committed here.
+It scores an image edit against its instruction, so the mask-scoring loop of RFD66606-1173 can reward the generators. The repository holds an inference smoke test and the scaffold for training task-specific adapters. Trained weights go to a model hub and are never committed here.
 
 ## Build and run
 
